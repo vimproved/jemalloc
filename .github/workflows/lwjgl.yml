@@ -61,6 +61,44 @@ jobs:
           aws s3 cp libjemalloc.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
         name: Upload git revision
 
+  linux-musl:
+    name: Linux Musl
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64]
+        include:
+          - ARCH: x64
+            HOST: x86_64-pc-linux-musl
+    steps:
+      - run: |
+          apk add git
+        name: Upgrade git
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: |
+          apk add build-base autoconf automake libtool aws-cli
+        name: Install build dependencies
+      - run: |
+          CFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ./autogen.sh ${{env.JEMALLOC_PARAMS}} --disable-initial-exec-tls --host=${{matrix.HOST}} || true
+          cat config.log
+        name: Configure build
+      - run: |
+          make
+          strip lib/libjemalloc.so
+        name: Build
+      - run: aws s3 cp lib/libjemalloc.so s3://lwjgl-build/nightly/linux-musl/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git config --global --add safe.directory $PWD
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libjemalloc.so.git
+          aws s3 cp libjemalloc.so.git s3://lwjgl-build/nightly/linux-musl/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
   linux-cross:
     name: Linux Cross
     runs-on: ubuntu-latest
